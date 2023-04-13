@@ -3,49 +3,35 @@ from sklearn.decomposition import PCA
 from sklearn.metrics.cluster import completeness_score, v_measure_score
 import pickle
 import numpy as np
-import pytest
 
 # You can access the `data` folder by uncommenting the following command
 data = pickle.load(open("data/documents.p", "rb"))
 
 def cluster_articles(data):
- # Extract document vectors from the data
-    vectors = data["vectors"]
+    # Clustering with 100 dimensional vectors
+    X = np.array(data['vectors'])
+    kmeans_100 = KMeans(n_clusters=10, random_state=2, tol=0.05, max_iter=50).fit(X)
     
-    # Perform clustering on 100-dimensional vectors
-    kmeans_100 = KMeans(n_clusters=10, random_state=2, tol=0.05, max_iter=50)
-    kmeans_100.fit(vectors)
-    labels_100 = kmeans_100.labels_
-    
-    # Compute number of observations in each cluster for 100-dimensional vectors
-    nobs_100 = [sum(labels_100 == i) for i in range(10)]
-    
-    # Reduce dimensionality of vectors using PCA
+    # Clustering with 10 dimensional vectors after PCA
     pca = PCA(n_components=10, random_state=2)
-    vectors_10 = pca.fit_transform(vectors)
+    X_pca = pca.fit_transform(X)
+    kmeans_10 = KMeans(n_clusters=10, random_state=2, tol=0.05, max_iter=50).fit(X_pca)
     
-    # Perform clustering on 10-dimensional vectors
-    kmeans_10 = KMeans(n_clusters=10, random_state=2, tol=0.05, max_iter=50)
-    kmeans_10.fit(vectors_10)
-    labels_10 = kmeans_10.labels_
+    # Completeness scores for cluster labels given true values
+    cs_100 = completeness_score(data['group'], kmeans_100.labels_)
+    cs_10 = completeness_score(data['group'], kmeans_10.labels_)
     
-    # Compute number of observations in each cluster for 10-dimensional vectors
-    nobs_10 = [sum(labels_10 == i) for i in range(10)]
+    # V-measure scores for cluster labels given true values
+    vms_100 = v_measure_score(data['group'], kmeans_100.labels_)
+    vms_10 = v_measure_score(data['group'], kmeans_10.labels_)
     
-    # Compute variance explained by the first component of PCA
+    # Number of observations in each cluster
+    nobs_100 = pd.Series(kmeans_100.labels_).value_counts().sort_index().tolist()
+    nobs_10 = pd.Series(kmeans_10.labels_).value_counts().sort_index().tolist()
+    
+    # Variance explained by the first component in PCA
     pca_explained = pca.explained_variance_ratio_[0]
-    
-    # Compute completeness score for clustering with 100-dimensional vectors
-    cs_100 = completeness_score(data["group"], labels_100)
-    
-    # Compute completeness score for clustering with 10-dimensional vectors
-    cs_10 = completeness_score(data["group"], labels_10)
-    
-    # Compute V-measure score for clustering with 100-dimensional vectors
-    vms_100 = v_measure_score(data["group"], labels_100)
-    
-    # Compute V-measure score for clustering with 10-dimensional vectors
-    vms_10 = v_measure_score(data["group"], labels_10)
+
     
     # Return a dictionary containing the computed metrics
     results = {
